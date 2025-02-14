@@ -1,0 +1,10 @@
+Diagnostics:
+  Suppress: 
+    unused-includes
+    unused-parameter
+CompileFlags:
+  Add:
+    - -Wno-unused-parameter
+    - -Wno-unused-variable
+    - -Wno-strict-prototypes
+  Remove: [--apcs=interwork, -mthumb-interwork,unused-includes]

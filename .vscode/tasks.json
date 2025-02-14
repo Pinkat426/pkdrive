@@ -1,0 +1,108 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Flash with J-Link",
+            "type": "shell",
+            "command": "C:\\Program Files\\SEGGER\\JLink_V798i\\JLink.exe",
+            "args": [
+                "-device",
+                "STM32F405RG",
+                "-if",
+                "SWD",
+                "-speed",
+                "4000",
+                "-autoconnect",
+                "1",
+                "-CommanderScript", "commands.jlink"
+            ],
+            "problemMatcher": [],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        },
+        {
+            "label": "Flash with openocd",
+            "type": "shell",
+            "command": "openocd",
+            "args": [
+                "-f",
+                "stm32f4discovery_dap_swd.cfg",
+                "-c",
+                "init",
+                "-c",
+                "reset halt",
+                "-c",
+                "flash write_image erase ./build/Debug/${workspaceFolderBasename}.elf 0x00000000",
+                "-c",
+                "reset run",
+                "-c",
+                "shutdown"
+            ],
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: configure",
+            "command": "configure",
+            "preset": "Debug",
+            "detail": "CMake template configure task"
+        },
+        {
+            "type": "cmake",
+            "label": "CMake:build",
+            "command": "build",
+            "preset": "Debug",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "problemMatcher": 
+            [
+                "$gcc"
+            ],
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: clean rebuild",
+            "command": "cleanRebuild",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "problemMatcher": {
+              "owner": "cpp",
+              "fileLocation": ["absolute"],
+              "pattern": [
+                {
+                  "regexp": "^([^:\\s]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                  "file": 1,
+                  "line": 2,
+                  "column": 3,
+                  "severity": 4,
+                  "message": 5
+                }
+              ]
+            }
+        },{
+            "label": "Build and Flash",
+            "dependsOn": [
+                "CMake:build",
+                "Flash with J-Link"
+            ],
+        }
+    ]
+}

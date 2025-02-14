@@ -1,0 +1,6 @@
+r                           // 复位设备
+h                           // 暂停 CPU
+loadfile ./build/Debug/pkdrive.elf  // 指定固件文件路径，支持 .bin 或 .hex
+r                           // 复位
+g                           // 运行程序
+q                           // 退出 J-Link CLI
