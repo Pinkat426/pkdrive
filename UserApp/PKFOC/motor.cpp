@@ -34,17 +34,6 @@ void Motor::start_pwm() {
   focR.start_pwm();
 }
 
-void Motor::calibration_angle_pole_pair(uint8_t enable_L, uint8_t enable_R) {
-  if (enable_L == ENABLE) {
-    focL.calibration_angle_pole_pair();
-    focL.halt_pwm();
-  }
-  if (enable_R == ENABLE) {
-    focR.calibration_angle_pole_pair();
-    focR.halt_pwm();
-  }
-}
-
 void Motor::enable_current_sampling(uint8_t enable_L, uint8_t enable_R) {
   if (enable_L == ENABLE)
     focL.start_adc_sample();

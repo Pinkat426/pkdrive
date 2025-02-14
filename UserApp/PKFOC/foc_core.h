@@ -14,14 +14,24 @@ public:
   PKFOC(SPI_HandleTypeDef *hspi, TIM_HandleTypeDef *htim,
         ADC_HandleTypeDef *hadc);
 
-  // FOC变换相关函数
-  void cal_angle_sincos();
-  void clark();
-  void iclark();
-  void park();
-  void ipark();
-  void generate_svpwm();
+  // 配置函数
+  void set_adc(ADC_HandleTypeDef *hadcx);
+  void set_tim(TIM_HandleTypeDef *htimx, uint32_t channelu, uint32_t channelv,
+               uint32_t channelw, uint32_t channelInJ);
+  void set_endocer(AS5047P *driver);
+  void set_target_I(float I_q, float I_d);
+  void set_UqUd(float _Uq, float _Ud);
+  void set_UqUdIqIdMAX(float _UqUdMax, float _IqIdMax);
 
+  // 控制循环
+  void get_angle();
+  void ctrl_open_Loop();
+  void ctrl_I_Loop();
+  void ctrl_speed_Loop();
+  void ctrl_position_Loop();
+  PIDController Speed_pid;
+  void set_speed(float speed) { Speed_pid.set_desireValue(speed); }
+  void set_position(float position) { Position_pid.set_desireValue(position); }
   // PWM和ADC控制
   void update_I(uint8_t valid_num, uint32_t Uu, uint32_t Uv);
   void update_pwm(float tu, float tv, float tw);
@@ -29,27 +39,13 @@ public:
   void start_pwm();
   void start_adc_sample();
 
-  // 设置函数
-  void set_adc(ADC_HandleTypeDef *hadcx);
-  void set_tim(TIM_HandleTypeDef *htimx, uint32_t channelu, uint32_t channelv,
-               uint32_t channelw, uint32_t channelInJ);
-  void set_endocer(AS5047P *driver);
-  void set_target_I(float I_q, float I_d);
-  void set_mechanical_offset(float offset);
-  void set_UqUd(float _Uq, float _Ud);
-  void set_UqUdIqIdMAX(float _UqUdMax, float _IqIdMax);
-
-  // 控制循环
-  void calibration_angle_pole_pair();
-  void get_angle();
-  void ctrl_halt_Loop();
-  void ctrl_open_Loop();
-  void ctrl_I_Loop();
-  void ctrl_speed_Loop();
-  void ctrl_position_Loop();
-  PIDController Speed_pid;
-  // 添加这个公共方法
-  void set_speed(float speed) { Speed_pid.set_desireValue(speed); }
+  // FOC变换相关函数
+  void cal_angle_sincos();
+  void clark();
+  void iclark();
+  void park();
+  void ipark();
+  void generate_svpwm();
 
 private:
   // 硬件相关
@@ -82,7 +78,6 @@ private:
 
   // 控制标志
   uint8_t motor_rotate_direct;
-  uint8_t calibration_ing;
 
   // PID控制器
   PIDController I_pid_q;

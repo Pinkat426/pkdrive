@@ -11,8 +11,8 @@ extern "C" {
 
 #include "FreeRTOS.h"
 #include "adc.h"
-#include "as5047p.h"
 #include "cmsis_os.h"
+#include "comm_task.h"
 #include "foc_task.h"
 #include "main.h"
 #include "task.h"

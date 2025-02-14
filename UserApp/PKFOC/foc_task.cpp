@@ -1,5 +1,6 @@
 #include "foc_task.h"
 #include "as5047p.h"
+#include "comm_define.h"
 #include "common_inc.h"
 #include "motor.h"
 #include "queue.h"
@@ -10,6 +11,7 @@ extern SPI_HandleTypeDef hspi3; // 添加这行
 extern SPI_HandleTypeDef hspi2; // 添加这行
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2; // 添加这行
+extern QueueHandle_t xFocQueue;
 
 #define PWM_CLOCK_HZ 42000000                          // 定时器时钟频率
 #define PWM_PERIOD 4199                                // ARR值
@@ -38,16 +40,30 @@ void foc_task(void) {
   motor.add_AS5047_Driver(&encoderL, &encoderR);
   motor.enable_current_sampling(ENABLE, DISABLE);
   motor.start_pwm();
+  FocMsg_t received_msg;
   // FOC线程主循环
   while (1) {
     // 临界区保护
-    taskENTER_CRITICAL();
+    // taskENTER_CRITICAL();
 
-    // angle_float = encoderL.readAngle(0);
-    // PRINT(foc, "%.3f", angle_float);
-    //  usb_printf("AngleL:%d\n", (uint16_t)angle_float);
+    if (xQueueReceive(xFocQueue, &received_msg, portMAX_DELAY) == pdPASS) {
+      switch (received_msg.type) {
+      case AIM_CMD:
+        // 处理坐标指令
 
-    taskEXIT_CRITICAL();
+        break;
+      case SPD_CMD:
+        // 处理速度指令
+        PRINT(WIN, "%d", received_msg.speed);
+
+        break;
+      case POS_CMD:
+        // 处理位置指令
+
+        break;
+      }
+    }
+    // taskEXIT_CRITICAL();
     osDelay(1);
   }
 }
@@ -78,7 +94,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc) {
   if (run_count == 10000) {
     run_count = 0;
     // 计算电流值
-    PRINT(WIN, "1");
+    // PRINT(WIN, "1");
   }
   // 读取ADC值
   if (hadc == &hadc1) {
@@ -99,9 +115,9 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc) {
     IL_value1_sum += IL_value[1];
     IL_value[0] = IL_value0_sum / 10;
     IL_value[1] = IL_value1_sum / 10;
-    // RINT(WIN, "%d,%d", IL_value[0], IL_value[1]);
+    // PRINT(WIN, "%d,%d", IL_value[0], IL_value[1]);
 
-    motor.main_deal(ENABLE, DISABLE, IL_value[0], IL_value[1], IR_value[0],
+    motor.main_deal(ENABLE, ENABLE, IL_value[0], IL_value[1], IR_value[0],
                     IR_value[1]);
     end = htim1.Instance->CNT;
     dir_end = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim1);

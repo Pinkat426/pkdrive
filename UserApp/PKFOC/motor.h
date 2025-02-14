@@ -21,7 +21,6 @@ public:
   Motor();
   void add_AS5047_Driver(AS5047P *as5047_L, AS5047P *as5047_R);
   void start_pwm();
-  void calibration_angle_pole_pair(uint8_t enable_L, uint8_t enable_R);
   void enable_current_sampling(uint8_t enable_L, uint8_t enable_R);
   void open_deal();
   void main_deal(uint8_t enable_L, uint8_t enable_R, uint32_t data1,
