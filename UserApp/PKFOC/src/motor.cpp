@@ -52,7 +52,8 @@ void Motor::main_deal(uint8_t enable_L, uint8_t enable_R, uint32_t data1,
     focL.update_I(2, data1, data2);
     // focL.get_angle();       // 获取当前角度
     // focL.set_speed(10.0f);  // 设置目标速度为10转/秒
-    focL.ctrl_speed_Loop(); // 执行速度环控制
+    // focL.ctrl_speed_Loop(); // 执行速度环控制
+    focL.ctrl_position_Loop();
   }
 
   if (enable_R == ENABLE) {
@@ -61,5 +62,13 @@ void Motor::main_deal(uint8_t enable_L, uint8_t enable_R, uint32_t data1,
     // focR.get_angle();       // 获取当前角度
     // focR.set_speed(10.0f);  // 设置目标速度为10转/秒
     focR.ctrl_speed_Loop(); // 执行速度环控制
+  }
+}
+
+void Motor::set_position(uint8_t number, float position) {
+  if (number == 0) {
+    focL.set_position(position);
+  } else {
+    focR.set_position(position);
   }
 }

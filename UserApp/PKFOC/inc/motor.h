@@ -3,6 +3,7 @@
 
 #include "as5047p.h"
 #include "foc_core.h"
+#include <stdint.h>
 
 typedef enum Ctrl_State {
   IDLE = 0,
@@ -25,6 +26,7 @@ public:
   void open_deal();
   void main_deal(uint8_t enable_L, uint8_t enable_R, uint32_t data1,
                  uint32_t data2, uint32_t data3, uint32_t data4);
+  void set_position(uint8_t number, float position);
 
 private:
   PKFOC focL; // 左电机FOC控制

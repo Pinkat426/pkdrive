@@ -9,12 +9,12 @@ PKFOC::PKFOC(SPI_HandleTypeDef *hspi, TIM_HandleTypeDef *htim,
   // 初始化基本参数
   Pole_Pair = 11;
   Ts = 1;
-  Udc = 24.0f;
+  Udc = 12.0f;
   Ud = 0.0;
   Uq = 1.5f;
 
   K = SQRT_3 * Ts / Udc;
-  mechanical_offset = 27.643;
+  mechanical_offset = 333.7734f; // up 87.5698f down 333.7734f
 
   // ADC偏移值
   ADC_Uu_offset = 2048;
@@ -41,13 +41,13 @@ PKFOC::PKFOC(SPI_HandleTypeDef *hspi, TIM_HandleTypeDef *htim,
   I_pid_d.set_PID(3, 0.015, 0);
   I_pid_d.set_Iintegral_Limit(200.0f);
 
-  Speed_pid.set_PID(-0.165f, -0.0007f, 0);
+  Speed_pid.set_PID(-0.165f, -0.007f, 0);
   Speed_pid.set_Iintegral_Limit(200.0f);
-  Speed_pid.set_desireValue(0);
+  Speed_pid.set_desireValue(0.1);
 
-  Position_pid.set_PID(5.0, 0.020, 0);
+  Position_pid.set_PID(2.5, 0.0020, 0.0);
   Position_pid.set_Iintegral_Limit(200.0f);
-  Position_pid.set_desireValue(0);
+  Position_pid.set_desireValue(180);
 
   _tx_max = 1;
   _tx_min = 0;
@@ -63,8 +63,8 @@ PKFOC::PKFOC(SPI_HandleTypeDef *hspi, TIM_HandleTypeDef *htim,
   position = 0;
 
   // 限制参数
-  UqUd_Limit_Max = 12.0f;
-  IqId_Limit_Max = 6.0f;
+  UqUd_Limit_Max = 6.0f;
+  IqId_Limit_Max = 3.0f;
 }
 
 void PKFOC::set_tim(TIM_HandleTypeDef *htimx, uint32_t channelu,
@@ -100,7 +100,7 @@ void PKFOC::set_UqUdIqIdMAX(float _UqUdMax, float _IqIdMax) {
 void PKFOC::get_angle() {
   float angle_d = as5047->readAngle(true);
   angle = angle * 0.3f + 0.7f * angle_d;
-
+  pos_gap = as5047->readPositionGap();
   if (angle_d < mechanical_offset) {
     angle_d = mechanical_offset - angle_d;
   } else {
@@ -169,7 +169,7 @@ void PKFOC::ctrl_speed_Loop() {
   Ud = (Ud > UqUd_Limit_Max)    ? UqUd_Limit_Max
        : (Ud < -UqUd_Limit_Max) ? -UqUd_Limit_Max
                                 : Ud;
-
+  PRINT(foc, "%.3f,%.3f", angle, speed_rad);
   ipark();
   generate_svpwm();
 }
@@ -180,21 +180,20 @@ void PKFOC::ctrl_position_Loop() {
   clark();
   park();
 
-  // 位置环控制
-  position += pos_gap;
-  float position_error = Position_pid.cal_PI(position);
-  Speed_pid.set_desireValue(position_error * 0.01f);
-
-  // 速度环控制
-  float speed_rad = as5047->readAngle(true);
-  float desire = Speed_pid.cal_PI(speed_rad);
-  I_pid_q.set_desireValue(desire);
+  if (as5047->as5047_read_speed_update() == 1) {
+    position += pos_gap;
+    float position_error = Position_pid.cal_PI(position);
+    Speed_pid.set_desireValue(position_error * 0.005f);
+    float speed_rad = as5047->readSpeed();
+    float desireI = Speed_pid.cal_PI(speed_rad);
+    I_pid_q.set_desireValue(desireI); // 设置期望力矩
+  }
 
   // 电流环控制
   Uq = I_pid_q.cal_PI_AntiSaturation(Iq);
   Ud = I_pid_d.cal_PI_AntiSaturation(Id);
-
-  // 限制电压输出
+  // PRINT(foc, "%.3f,%.3f", angle, position);
+  //  限制电压输出
   Uq = (Uq > UqUd_Limit_Max)    ? UqUd_Limit_Max
        : (Uq < -UqUd_Limit_Max) ? -UqUd_Limit_Max
                                 : Uq;

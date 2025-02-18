@@ -66,7 +66,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "pkdrive::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-pkdrive-Debug-85d8e817e7d84d616ade.json",
+					"jsonFile" : "target-pkdrive-Debug-292401e20bf1207720b2.json",
 					"name" : "pkdrive",
 					"projectIndex" : 0
 				}
@@ -76,7 +76,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "D:/ls_stm32/projects/pkdrive/pkdrive/build/Debug",
+		"build" : "D:/ls_stm32/projects/pkdrive/pkdrive/build",
 		"source" : "D:/ls_stm32/projects/pkdrive/pkdrive"
 	},
 	"version" : 

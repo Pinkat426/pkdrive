@@ -55,6 +55,8 @@ float x_buf[10] = {0};
 float y_buf[10] = {0};
 float x_sum = 0.0f;
 float y_sum = 0.0f;
+float speed_buf2[10] = {0};
+float speed_sum2 = 0.0f;
 /********************* 核心功能函数 *********************/
 float AS5047P::readAngle(bool enableDaec) {
   float angle = 0.0f;
@@ -65,45 +67,13 @@ float AS5047P::readAngle(bool enableDaec) {
 
   rawData = spiTransfer(cmd);
   rawData = spiTransfer(AS5047_CMD_NOP); // 读取数据需要NOP命令
-
+  // rawData = 0x3FFF;
   /* 校验数据有效性 */
   if ((rawData & AS5047_PARITY_ERR_MASK) && !checkParity(rawData)) {
     handleError(rawData & AS5047_ERROR_MASK);
   }
   angle = ((((float)(rawData & 0x3FFF) * 360.0f) / 16384.0f) - 180.0f) * 2.0f;
-  float radians = angle * M_PI / 180.0f;
 
-  float x_new = cos(radians);
-  float y_new = sin(radians);
-
-  // 更新滑窗和总和
-  x_sum -= x_buf[0];
-  y_sum -= y_buf[0];
-
-  // 滑动数组元素
-  for (uint8_t i = 0; i < 9; i++) {
-    x_buf[i] = x_buf[i + 1];
-    y_buf[i] = y_buf[i + 1];
-  }
-
-  // 存入新分量并更新总和
-  x_buf[9] = x_new;
-  y_buf[9] = y_new;
-  x_sum += x_new;
-  y_sum += y_new;
-
-  // 计算平均向量对应的角度
-  float avg_x = x_sum / 10.0f;
-  float avg_y = y_sum / 10.0f;
-
-  float filtered_angle = atan2f(avg_y, avg_x) * 180.0f / M_PI;
-
-  if (filtered_angle < 0) {
-    filtered_angle += 360.0f;
-  }
-
-  angle = filtered_angle;
-  // PRINT(foc, "%.3f", angle);
   cnt += 1;
   if (cnt == 1) {
     float angle_error = (angle - last_angle);
@@ -123,11 +93,22 @@ float AS5047P::readAngle(bool enableDaec) {
     speed_buf[9] = speed_rad;
     speed_sum += speed_buf[9];
     speed_rad = speed_sum / 10.0f;
+    speed_sum2 -= speed_buf2[0];
+    for (uint8_t i = 0; i < 9; i++) {
+      speed_buf2[i] = speed_buf2[i + 1];
+    }
+    speed_buf2[9] = speed_rad;
+    speed_sum2 += speed_buf2[9];
+    speed_rad = speed_sum2 / 10.0f;
+
     last_angle = angle;
     // PRINT(foc, "%.3f,%.3f", angle_error, speed_rad);
     cnt = 0;
     speed_update = 1;
   }
+
+  // PRINT(foc, "%.3f", angle);
+
   return angle;
 }
 
@@ -135,6 +116,8 @@ float AS5047P::readSpeed() {
   speed_update = 0;
   return speed_rad;
 }
+
+float AS5047P::readPositionGap() { return pos_gap; }
 
 /********************* 辅助函数 *********************/
 bool AS5047P::checkParity(uint16_t data) {

@@ -3,6 +3,7 @@
 
 /* 硬件依赖 */
 #include "stm32f4xx_hal.h"
+#include <cmath>
 #include <math.h>
 #include <stdbool.h>
 
@@ -28,7 +29,8 @@ public:
   float readAngle(bool enableDaec = false);
   float readSpeed();
   void debugOutput();
-
+  float readPositionGap();
+  uint8_t as5047_read_speed_update() { return speed_update; };
   /* 诊断接口 */
   uint8_t getLastError() const { return lastError; }
   void clearErrors() { lastError = NO_ERROR; }
