@@ -20,6 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
+#include "dma.h"
 #include "spi.h"
 #include "tim.h"
 #include "usb_device.h"
@@ -57,6 +58,16 @@
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
+void DWT_Init(void) {
+  // 启用DWT计时器，首先要启用TPIU和ITM
+  if (!(CoreDebug->DEMCR & CoreDebug_DEMCR_TRCENA_Msk)) {
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk; // 启用追踪功能
+  }
+
+  if (!(DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk)) {
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk; // 启用周期计数器
+  }
+}
 
 /* USER CODE END PFP */
 
@@ -106,16 +117,18 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI3_Init();
   MX_TIM1_Init();
   MX_ADC1_Init();
   MX_ADC2_Init();
   MX_SPI2_Init();
   MX_TIM8_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   SEGGER_SYSVIEW_Conf();
   // pwmstart
-
+  DWT_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */

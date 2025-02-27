@@ -59,6 +59,7 @@ file(GLOB  USER_SOURCES
 "UserApp/PKFOC/src/*.cpp"
 "UserApp/comm/*.cpp"
 "UserApp/comm/*.c"
+"UserApp/PKUI/src/*.cpp"
 "systemview/*.c"
 "systemview/*.s"
 )
@@ -75,6 +76,7 @@ add_subdirectory(cmake/stm32cubemx)
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
+    DSP/Lib/GCC
 )
 
 # Add sources to executable
@@ -88,21 +90,24 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     UserApp/PKFOC/inc
     UserApp/comm
     UserApp
+    UserApp/PKUI/inc
     systemview
+    DSP/Include
 )
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
+    ARM_MATH_CM4 
 )
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
-
+    arm_cortexM4lf_math
     # Add user defined libraries
 )
 
 target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
-    -u _printf_float
+-u _printf_float
 )

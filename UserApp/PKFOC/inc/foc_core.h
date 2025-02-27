@@ -22,6 +22,7 @@ public:
   void set_target_I(float I_q, float I_d);
   void set_UqUd(float _Uq, float _Ud);
   void set_UqUdIqIdMAX(float _UqUdMax, float _IqIdMax);
+  void set_mechnical_offset(float offset) { mechanical_offset = offset; }
 
   // 控制循环
   void get_angle();
@@ -29,9 +30,15 @@ public:
   void ctrl_I_Loop();
   void ctrl_speed_Loop();
   void ctrl_position_Loop();
-  PIDController Speed_pid;
+  void my_sped_control();
+  void my_pos_control();
+  void my_aim_control();
+  // 状态获取函数
+  float readAngle() { return angle; }
+
   void set_speed(float speed) { Speed_pid.set_desireValue(speed); }
   void set_position(float position) { Position_pid.set_desireValue(position); }
+  void set_aimerr(float err) { aimerr = err; }
   // PWM和ADC控制
   void update_I(uint8_t valid_num, uint32_t Uu, uint32_t Uv);
   void update_pwm(float tu, float tv, float tw);
@@ -75,15 +82,16 @@ private:
   float pos_gap;
   float position;
   float speed;
-
+  float aimerr;
   // 控制标志
   uint8_t motor_rotate_direct;
 
   // PID控制器
   PIDController I_pid_q;
   PIDController I_pid_d;
-
+  PIDController Speed_pid;
   PIDController Position_pid;
+  PIDController Aim_pid;
   float _tx_max, _tx_min;
   float _Ix_max, _Ix_min;
   float _Iqd_max, _Iqd_min;

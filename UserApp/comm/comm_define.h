@@ -30,5 +30,4 @@ typedef struct {
 #ifdef __cplusplus
 }
 #endif
-
 #endif /* COMM_DEFINE_H */

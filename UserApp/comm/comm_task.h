@@ -4,12 +4,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "main.h"
+#include "common_inc.h"
+
 void comm_task(void);
 void msg_deal(uint8_t *buf, uint32_t len);
 
 #ifdef __cplusplus
 }
-
 #endif
 #endif /* FOC_TASK_H */

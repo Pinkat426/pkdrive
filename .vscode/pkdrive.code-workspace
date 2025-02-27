@@ -9,6 +9,7 @@
 			"enableCodeCompletionPro": false
 		},
 		"marscode.enableInlineCommand": true,
-		"marscode.chatLanguage": "cn"
+		"marscode.chatLanguage": "cn",
+		"commentTranslate.browse.mode": "inplace"
 	}
 }

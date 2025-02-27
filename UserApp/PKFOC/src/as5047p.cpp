@@ -1,5 +1,6 @@
 #include "as5047p.h"
 #include "common_inc.h"
+#include "stm32f4xx_hal.h"
 #include <cmath>
 #include <cstdint>
 
@@ -43,10 +44,13 @@ void AS5047P::spiCsHigh(void) {
 uint16_t AS5047P::spiTransfer(uint16_t txData) {
   uint16_t rxData = 0;
 
-  spiCsLow();
+  // spiCsLow();
+
+  CS_Port->BSRR = (uint32_t)CS_Pin << 16U;
   HAL_SPI_TransmitReceive(hspi, (uint8_t *)&txData, (uint8_t *)&rxData, 1,
                           HAL_MAX_DELAY);
-  spiCsHigh();
+  CS_Port->BSRR = CS_Pin;
+  // spiCsHigh();
 
   return rxData;
 }
@@ -83,7 +87,7 @@ float AS5047P::readAngle(bool enableDaec) {
       angle_error += 360;
     }
     speed_rad =
-        ((angle_error) * 1000) * 0.017453292f; // 弧度  speed_rad * 0.2f + 0.8f
+        ((angle_error) * 2500) * 0.017453292f; // 弧度  speed_rad * 0.2f + 0.8f
                                                // *    0.166751197f * 1000;//RPM
     pos_gap = angle_error;
     speed_sum -= speed_buf[0];

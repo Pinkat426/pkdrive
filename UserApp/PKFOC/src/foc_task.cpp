@@ -25,8 +25,9 @@ extern QueueHandle_t xFocQueue;
 #define control_period 0.01f // 控制周期1ms
 #define delta_theta (target_rpm * 2 * M_PI / 60) * POLE_PAIRS *control_period
 
+uint32_t dwt_start, dwt_end;
 volatile float theta = 0.0f;
-uint16_t start, end;
+uint32_t start, end;
 uint16_t dir_start, dir_end;
 uint32_t I_value[2];
 volatile float voltage0, voltage1;
@@ -56,7 +57,7 @@ static Motor motor;
 volatile uint16_t angle_int;
 
 float angle_float;
-
+float pc_aim_pos = 0.0f;
 void foc_task(void) {
   motor.add_AS5047_Driver(&encoderL, &encoderR);
   motor.enable_current_sampling(ENABLE, ENABLE);
@@ -71,6 +72,7 @@ void foc_task(void) {
       if (xQueueReceive(xFocQueue, &received_msg, portMAX_DELAY) == pdPASS) {
         switch (received_msg.type) {
         case AIM_CMD:
+          PRINT(WIN, "%d,%d", received_msg.aim.x, received_msg.aim.y);
           // 处理坐标指令
           break;
         case SPD_CMD:
@@ -79,30 +81,27 @@ void foc_task(void) {
           break;
         case POS_CMD:
           // 处理位置指令
-          PRINT(WIN, "%d", received_msg.position);
+          pc_aim_pos = ((float)received_msg.position) / 1000.0f;
+          motor.set_position(0, pc_aim_pos);
           break;
         }
       }
     }
     // taskEXIT_CRITICAL();
+
     osDelay(1);
   }
 }
-
+uint32_t dwt_cycle;
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc) {
 
   // 临界区保护
   UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
   run_count++;
-  if (run_count == 10000) {
-    run_count = 0;
-    // 计算电流值
-    // PRINT(WIN, "1");
-  }
+  dwt_start = DWT->CYCCNT;
   // 读取ADC值
   if (hadc == &hadc1) {
-    start = htim1.Instance->CNT;
-    dir_start = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim1);
+
     IL_value[0] = hadc1.Instance->JDR1; // 获取转换结果
     IL_value[1] = hadc1.Instance->JDR2; // 获取转换结果
 
@@ -118,13 +117,14 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc) {
     IL_value1_sum += IL_value[1];
     IL_value[0] = IL_value0_sum / 10;
     IL_value[1] = IL_value1_sum / 10;
-    // PRINT(WIN, "%d,%d", IL_value[0], IL_value[1]);
     motor.main_deal(ENABLE, DISABLE, IL_value[0], IL_value[1], IR_value[0],
                     IR_value[1]);
-    // motor.main_deal(ENABLE, ENABLE, IL_value[0], IL_value[1],
-    // IR_value[0],IR_value[1]);
-    end = htim1.Instance->CNT;
-    dir_end = __HAL_TIM_IS_TIM_COUNTING_DOWN(&htim1);
+
+    dwt_end = DWT->CYCCNT;
+    dwt_cycle = dwt_end - dwt_start;
+    if (run_count == 10) {
+      run_count = 0;
+    }
   } else if (hadc == &hadc2) {
     IR_value[0] = hadc2.Instance->JDR1; // 获取转换结果
     IR_value[1] = hadc2.Instance->JDR2; // 获取转换结果

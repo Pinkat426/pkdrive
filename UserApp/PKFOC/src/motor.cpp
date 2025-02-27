@@ -17,8 +17,12 @@ Motor::Motor() : focL(&hspi3, &htim1, &hadc1), focR(&hspi2, &htim8, &hadc2) {
                TIM_CHANNEL_4);
   focR.set_adc(&hadc2);
 
-  Lstate.ctrlState = Motor_SPEED_MODE;
-  Rstate.ctrlState = IDLE;
+  focL.set_mechnical_offset(up_mechanical_offset);
+  focR.set_mechnical_offset(down_mechanical_offset);
+  // 初始化电机状态
+
+  Lstate.ctrlState = Motor_POSITION_MODE;
+  Rstate.ctrlState = Motor_POSITION_MODE;
 
   Send_Detail_cnt = 0;
   Send_Detail_Flag = DISABLE;
@@ -48,20 +52,12 @@ void Motor::open_deal() {
 void Motor::main_deal(uint8_t enable_L, uint8_t enable_R, uint32_t data1,
                       uint32_t data2, uint32_t data3, uint32_t data4) {
   if (enable_L == ENABLE) {
-    // PRINT(WIN, "%d,%d", data1, data2);
     focL.update_I(2, data1, data2);
-    // focL.get_angle();       // 获取当前角度
-    // focL.set_speed(10.0f);  // 设置目标速度为10转/秒
-    // focL.ctrl_speed_Loop(); // 执行速度环控制
-    focL.ctrl_position_Loop();
+    focL.my_aim_control();
   }
-
   if (enable_R == ENABLE) {
     focR.update_I(2, data3, data4);
-    focR.Speed_pid.set_desireValue(0.08);
-    // focR.get_angle();       // 获取当前角度
-    // focR.set_speed(10.0f);  // 设置目标速度为10转/秒
-    focR.ctrl_speed_Loop(); // 执行速度环控制
+    focR.ctrl_position_Loop();
   }
 }
 
@@ -72,3 +68,6 @@ void Motor::set_position(uint8_t number, float position) {
     focR.set_position(position);
   }
 }
+void Motor::set_aim(float x, float y) {
+
+};

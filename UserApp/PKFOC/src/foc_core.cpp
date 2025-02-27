@@ -1,5 +1,8 @@
 #include "foc_core.h"
+#include "arm_math.h"
 #include "common_inc.h"
+#include "math.h"
+#include <cstdint>
 
 #define ARR_10Khz 4199
 
@@ -41,13 +44,17 @@ PKFOC::PKFOC(SPI_HandleTypeDef *hspi, TIM_HandleTypeDef *htim,
   I_pid_d.set_PID(3, 0.015, 0);
   I_pid_d.set_Iintegral_Limit(200.0f);
 
-  Speed_pid.set_PID(-0.165f, -0.007f, 0);
+  Speed_pid.set_PID(-0.065f, -0.007f, 0);
   Speed_pid.set_Iintegral_Limit(200.0f);
-  Speed_pid.set_desireValue(0.1);
+  Speed_pid.set_desireValue(0.5);
 
-  Position_pid.set_PID(2.5, 0.0020, 0.0);
+  Position_pid.set_PID(20, 0.0020, 0.0);
   Position_pid.set_Iintegral_Limit(200.0f);
-  Position_pid.set_desireValue(180);
+  Position_pid.set_desireValue(160);
+
+  Aim_pid.set_PID(20, 0.0020, 0.0);
+  Aim_pid.set_Iintegral_Limit(200.0f);
+  Aim_pid.set_desireValue(0);
 
   _tx_max = 1;
   _tx_min = 0;
@@ -62,6 +69,7 @@ PKFOC::PKFOC(SPI_HandleTypeDef *hspi, TIM_HandleTypeDef *htim,
   pos_gap = 0;
   position = 0;
 
+  aimerr = 0;
   // 限制参数
   UqUd_Limit_Max = 6.0f;
   IqId_Limit_Max = 3.0f;
@@ -113,8 +121,6 @@ void PKFOC::get_angle() {
 
 /** 控制循环 **/
 void PKFOC::ctrl_open_Loop() {
-  get_angle();
-  cal_angle_sincos();
   clark();
   park();
   ipark();
@@ -153,9 +159,6 @@ void PKFOC::ctrl_speed_Loop() {
   // 速度环控制
   float speed_rad = as5047->readSpeed(); // 获取当前速度
   float desire = Speed_pid.cal_PI(speed_rad);
-  // PRINT(foc, "%.3f", angle);
-  //  PRINT(foc, "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f", speed_rad, angle, Iq, Id,
-  //        Ia * 10, Ib * 10, Ic * 10, pos_gap);
   I_pid_q.set_desireValue(desire); // 速度环输出作为电流环的目标值
 
   // 电流环控制
@@ -170,6 +173,33 @@ void PKFOC::ctrl_speed_Loop() {
        : (Ud < -UqUd_Limit_Max) ? -UqUd_Limit_Max
                                 : Ud;
   PRINT(foc, "%.3f,%.3f", angle, speed_rad);
+  ipark();
+  generate_svpwm();
+}
+void PKFOC::my_sped_control() {
+  static uint8_t run_times = 3;
+  run_times++;
+  if (run_times == 4) {
+    get_angle();
+    cal_angle_sincos();
+    run_times = 0;
+  }
+
+  float speed_rad = as5047->readSpeed(); // 获取当前速度
+  float desire = Speed_pid.cal_PI(speed_rad);
+  I_pid_q.set_desireValue(desire); // 速度环输出作为电流环的目标值
+  // 电流环控制
+  Uq = I_pid_q.cal_PI_AntiSaturation(Iq);
+  Ud = I_pid_d.cal_PI_AntiSaturation(Id);
+
+  // 限制电压输出
+  Uq = (Uq > UqUd_Limit_Max)    ? UqUd_Limit_Max
+       : (Uq < -UqUd_Limit_Max) ? -UqUd_Limit_Max
+                                : Uq;
+  Ud = (Ud > UqUd_Limit_Max)    ? UqUd_Limit_Max
+       : (Ud < -UqUd_Limit_Max) ? -UqUd_Limit_Max
+                                : Ud;
+  // PRINT(foc, "%.3f,%.3f", angle, speed_rad);
   ipark();
   generate_svpwm();
 }
@@ -193,7 +223,81 @@ void PKFOC::ctrl_position_Loop() {
   Uq = I_pid_q.cal_PI_AntiSaturation(Iq);
   Ud = I_pid_d.cal_PI_AntiSaturation(Id);
   // PRINT(foc, "%.3f,%.3f", angle, position);
-  //  限制电压输出
+  //   限制电压输出
+  Uq = (Uq > UqUd_Limit_Max)    ? UqUd_Limit_Max
+       : (Uq < -UqUd_Limit_Max) ? -UqUd_Limit_Max
+                                : Uq;
+  Ud = (Ud > UqUd_Limit_Max)    ? UqUd_Limit_Max
+       : (Ud < -UqUd_Limit_Max) ? -UqUd_Limit_Max
+                                : Ud;
+
+  ipark();
+  generate_svpwm();
+}
+volatile uint8_t run_timesk = 3;
+void PKFOC::my_pos_control() {
+
+  run_timesk++;
+  if (run_timesk == 4) {
+    get_angle();
+    cal_angle_sincos();
+    run_timesk = 0;
+  }
+
+  clark();
+  park();
+
+  if (as5047->as5047_read_speed_update() == 1) {
+    position += pos_gap;
+    float position_error = Position_pid.cal_PI(position);
+    Speed_pid.set_desireValue(position_error * 0.005f);
+    float speed_rad = as5047->readSpeed();
+    float desireI = Speed_pid.cal_PI(speed_rad);
+    I_pid_q.set_desireValue(desireI); // 设置期望力矩
+  }
+
+  // 电流环控制
+  Uq = I_pid_q.cal_PI_AntiSaturation(Iq);
+  Ud = I_pid_d.cal_PI_AntiSaturation(Id);
+
+  //   限制电压输出
+  Uq = (Uq > UqUd_Limit_Max)    ? UqUd_Limit_Max
+       : (Uq < -UqUd_Limit_Max) ? -UqUd_Limit_Max
+                                : Uq;
+  Ud = (Ud > UqUd_Limit_Max)    ? UqUd_Limit_Max
+       : (Ud < -UqUd_Limit_Max) ? -UqUd_Limit_Max
+                                : Ud;
+
+  ipark();
+  generate_svpwm();
+}
+
+void PKFOC::my_aim_control() {
+  run_timesk++;
+  if (run_timesk == 4) {
+    get_angle();
+    cal_angle_sincos();
+    run_timesk = 0;
+    PRINT(foc, "%.3f", angle);
+  }
+
+  clark();
+  park();
+
+  if (as5047->as5047_read_speed_update() == 1) {
+    position += pos_gap;
+    float position_error = Position_pid.cal_PI(position);
+    Speed_pid.set_desireValue(position_error * 0.005f);
+    float speed_rad = as5047->readSpeed();
+    float desireI = Speed_pid.cal_PI(speed_rad);
+    I_pid_q.set_desireValue(desireI); // 设置期望力矩
+  }
+
+  // 电流环控制
+  Uq = I_pid_q.cal_PI_AntiSaturation(Iq);
+  Ud = I_pid_d.cal_PI_AntiSaturation(Id);
+
+  //   限制电压输出
   Uq = (Uq > UqUd_Limit_Max)    ? UqUd_Limit_Max
        : (Uq < -UqUd_Limit_Max) ? -UqUd_Limit_Max
                                 : Uq;
@@ -208,14 +312,13 @@ void PKFOC::ctrl_position_Loop() {
 /** ADC与PWM相关函数 **/
 void PKFOC::update_I(uint8_t valid_num, uint32_t Uu, uint32_t Uv) {
   // 将ADC值转换为电压
-  float Uu_ = ((float)((int)Uu - (int)ADC_Uu_offset)) * 0.001611328f;
-  float Uv_ = ((float)((int)Uv - (int)ADC_Uv_offset)) * 0.001611328f;
+  float Uu_ = ((float)((int)Uu - (int)ADC_Uu_offset)) * 0.0016f; // 0.001611328f
+  float Uv_ = ((float)((int)Uv - (int)ADC_Uv_offset)) * 0.0016f;
 
   // 计算相电流，使用低通滤波
-  Ia = Ia * 0.2f + 2.2857142856f * Uu_;
-  Ib = Ib * 0.2f + 2.2857142856f * Uv_;
+  Ia = Ia * 0.2f + 2.2857f * Uu_; // 2.2857142856f
+  Ib = Ib * 0.2f + 2.2857f * Uv_;
   Ic = Ic * 0.2f + 0.8f * (-(Ia + Ib));
-  // PRINT(foc, "%.5f,%.5f,%.5f", Ia, Ib, Ic);
 }
 
 void PKFOC::update_pwm(float tu, float tv, float tw) {
@@ -268,21 +371,21 @@ void PKFOC::cal_angle_sincos() {
   float electrical_angle = mechanical_angle * Pole_Pair;
   while (electrical_angle > 360)
     electrical_angle -= 360.0f;
-  electrical_angle *= 0.0174532922222f;
+  electrical_angle *= 0.0174f; // 0.0174532922222f
 
-  cosVal = cos(electrical_angle);
-  sinVal = sin(electrical_angle);
+  cosVal = arm_cos_f32(electrical_angle);
+  sinVal = arm_sin_f32(electrical_angle);
 }
 
 void PKFOC::clark() {
   Ialpha = Ia;
-  Ibeta = 0.5773502691896f * (Ia + 2 * Ib);
+  Ibeta = 0.577f * (Ia + 2 * Ib); // 0.5773502691896f
 }
 
 void PKFOC::iclark() {
   Ua = Ualpha;
-  Ub = -Ualpha / 2 + 0.8660254037f * Ubeta;
-  Uc = -Ualpha / 2 - 0.8660254037f * Ubeta;
+  Ub = -Ualpha / 2 + 0.866f * Ubeta; // 0.8660254037f
+  Uc = -Ualpha / 2 - 0.866f * Ubeta;
 }
 
 void PKFOC::park() {

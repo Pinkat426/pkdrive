@@ -61,6 +61,12 @@ void Error_Handler(void);
 #define SPI2_CS_GPIO_Port GPIOB
 #define SPI3_CS_Pin GPIO_PIN_15
 #define SPI3_CS_GPIO_Port GPIOA
+#define LCD_RESET_Pin GPIO_PIN_2
+#define LCD_RESET_GPIO_Port GPIOD
+#define LCD_CS_Pin GPIO_PIN_6
+#define LCD_CS_GPIO_Port GPIOB
+#define LCD_RS_Pin GPIO_PIN_7
+#define LCD_RS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

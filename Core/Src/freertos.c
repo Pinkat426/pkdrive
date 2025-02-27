@@ -26,13 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-#include "SEGGER_RTT.h"
-#include "comm_define.h"
-#include "comm_task.h"
-#include <foc_task.h>
-#include <queue.h>
-#include <stdint.h>
-#include <usbd_cdc_if.h>
+#include "common_inc.h"
 
 /* USER CODE END Includes */
 
@@ -80,12 +74,12 @@ const osThreadAttr_t Task_foc_attributes = {
   .stack_size = sizeof(Task_focBuffer),
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for Task_led */
-osThreadId_t Task_ledHandle;
+/* Definitions for Task_lcd */
+osThreadId_t Task_lcdHandle;
 uint32_t Task_ledBuffer[ 512 ];
 osStaticThreadDef_t Task_ledControlBlock;
-const osThreadAttr_t Task_led_attributes = {
-  .name = "Task_led",
+const osThreadAttr_t Task_lcd_attributes = {
+  .name = "Task_lcd",
   .cb_mem = &Task_ledControlBlock,
   .cb_size = sizeof(Task_ledControlBlock),
   .stack_mem = &Task_ledBuffer[0],
@@ -149,8 +143,8 @@ void MX_FREERTOS_Init(void) {
   /* creation of Task_foc */
   Task_focHandle = osThreadNew(StartTask02, NULL, &Task_foc_attributes);
 
-  /* creation of Task_led */
-  Task_ledHandle = osThreadNew(StartTask03, NULL, &Task_led_attributes);
+  /* creation of Task_lcd */
+  Task_lcdHandle = osThreadNew(StartTask03, NULL, &Task_lcd_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -180,13 +174,12 @@ void StartDefaultTask(void *argument)
   for (;;) {
     // 通信线程
     comm_task();
-    // osDelay(1);
   }
   /* USER CODE END StartDefaultTask */
 }
 
 /* USER CODE BEGIN Header_StartTask02 */
-/**
+/* *
  * @brief Function implementing the Task_foc thread.
  * @param argument: Not used
  * @retval None
@@ -200,7 +193,6 @@ void StartTask02(void *argument)
   /* Infinite loop */
   for (;;) {
     // FOC线程
-    // SEGGER_RTT_WriteString(0, "task02\n");
     foc_task();
   }
   /* USER CODE END StartTask02 */
@@ -217,13 +209,10 @@ void StartTask02(void *argument)
 void StartTask03(void *argument)
 {
   /* USER CODE BEGIN StartTask03 */
-  uint32_t kkk = 0;
 
   /* Infinite loop */
   for (;;) {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_14);
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_15);
-    osDelay(1000);
+    lcd_task();
   }
   /* USER CODE END StartTask03 */
 }
