@@ -278,7 +278,7 @@ void PKFOC::my_aim_control() {
     get_angle();
     cal_angle_sincos();
     run_timesk = 0;
-    PRINT(foc, "%.3f", angle);
+    // PRINT(foc, "%.3f", angle);
   }
 
   clark();

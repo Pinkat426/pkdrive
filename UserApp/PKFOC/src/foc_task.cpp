@@ -65,9 +65,6 @@ void foc_task(void) {
   FocMsg_t received_msg;
   // FOC线程主循环
   while (1) {
-    // 临界区保护
-    // taskENTER_CRITICAL();
-
     if (1) {
       if (xQueueReceive(xFocQueue, &received_msg, portMAX_DELAY) == pdPASS) {
         switch (received_msg.type) {
@@ -87,8 +84,6 @@ void foc_task(void) {
         }
       }
     }
-    // taskEXIT_CRITICAL();
-
     osDelay(1);
   }
 }

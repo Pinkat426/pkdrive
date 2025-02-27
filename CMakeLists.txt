@@ -62,6 +62,7 @@ file(GLOB  USER_SOURCES
 "UserApp/PKUI/src/*.cpp"
 "systemview/*.c"
 "systemview/*.s"
+"BSP/*.cpp"
 )
 
 
@@ -93,6 +94,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     UserApp/PKUI/inc
     systemview
     DSP/Include
+    BSP
 )
 
 # Add project symbols (macros)

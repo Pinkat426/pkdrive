@@ -10,3 +10,9 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
+build
+flash.jflash
+.cache/
+.vscode/
+.clangd/
+stm32f4discovery_dap_swd.cfg
