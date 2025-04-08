@@ -3,12 +3,20 @@
 //
 
 #include "lcd_driver.h"
+#include "cmsis_os.h"
 #include "font.h"
 #include <cstdint>
 
+// 全局变量用于DMA回调
+static volatile bool g_dma_busy = false;
+
 uint16_t lcd_buff[320 * 80];
 
-LCD_Driver::LCD_Driver() {}
+LCD_Driver::LCD_Driver() {
+  active_buffer = buffer1;
+  display_buffer = buffer2;
+  dma_busy = false;
+}
 
 void LCD_Driver::Init(uint8_t USE_HORIZONTAL) {
   LCD_CS_H;
@@ -125,10 +133,12 @@ void LCD_Driver::Init(uint8_t USE_HORIZONTAL) {
   _lcd_cmd(0x11);
   HAL_Delay(120);
   _lcd_cmd(0x29);
+
+  // 初始化缓冲区
+  fill(0x0000);
 }
 
 void LCD_Driver::_spi_mode_set() {
-
   if (HAL_SPI_DeInit(&hspi1) != HAL_OK) {
     while (true)
       usb_printf("lcd spi deinit error\r\n");
@@ -152,36 +162,40 @@ void LCD_Driver::_spi_mode_set() {
 }
 
 void LCD_Driver::_spi_send(uint8_t *data, uint16_t len) {
-  //_spi_mode_set();
   LCD_CS_L;
   HAL_SPI_Transmit(&hspi1, data, len, 0xffff);
   LCD_CS_H;
 }
+
 void LCD_Driver::_spi_sendDMA(uint8_t *data, uint16_t len) {
-  //_spi_mode_set();
   LCD_CS_L;
+  dma_busy = true;
+  g_dma_busy = true;
   HAL_SPI_Transmit_DMA(&hspi1, data, len);
-  while (HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY)
-    ;
-  LCD_CS_H;
 }
+
 void LCD_Driver::_lcd_cmd(uint8_t cmd) {
   LCD_CMD;
-  //_spi_send(&cmd, 1);
   _spi_sendDMA(&cmd, 1);
+  wait_for_display();
 }
+
 void LCD_Driver::_lcd_data(uint8_t data) {
   LCD_DATA;
   _spi_sendDMA(&data, 1);
+  wait_for_display();
 }
+
 void LCD_Driver::_lcd_data16(uint16_t data) {
   _lcd_data(data >> 8);
   _lcd_data(data);
 }
+
 void LCD_Driver::_lcd_datas(uint8_t *data, uint16_t len) {
   LCD_DATA;
   _spi_send(data, len);
 }
+
 void LCD_Driver::_lcd_datasDMA(uint8_t *data, uint16_t len) {
   LCD_DATA;
   _spi_sendDMA(data, len);
@@ -189,29 +203,13 @@ void LCD_Driver::_lcd_datasDMA(uint8_t *data, uint16_t len) {
 
 void LCD_Driver::_lcd_set_address(uint16_t x1, uint16_t y1, uint16_t x2,
                                   uint16_t y2) {
-  if (HORIZONTAL == 0) {
+  if (HORIZONTAL == 0 || HORIZONTAL == 1) {
     _lcd_cmd(0x2a);
     _lcd_data16(x1 + 34);
     _lcd_data16(x2 + 34);
     _lcd_cmd(0x2b);
     _lcd_data16(y1);
     _lcd_data16(y2);
-    _lcd_cmd(0x2c);
-  } else if (HORIZONTAL == 1) {
-    _lcd_cmd(0x2a);
-    _lcd_data16(x1 + 34);
-    _lcd_data16(x2 + 34);
-    _lcd_cmd(0x2b);
-    _lcd_data16(y1);
-    _lcd_data16(y2);
-    _lcd_cmd(0x2c);
-  } else if (HORIZONTAL == 2) {
-    _lcd_cmd(0x2a);
-    _lcd_data16(x1);
-    _lcd_data16(x2);
-    _lcd_cmd(0x2b);
-    _lcd_data16(y1 + 34);
-    _lcd_data16(y2 + 34);
     _lcd_cmd(0x2c);
   } else {
     _lcd_cmd(0x2a);
@@ -224,53 +222,53 @@ void LCD_Driver::_lcd_set_address(uint16_t x1, uint16_t y1, uint16_t x2,
   }
 }
 
-void LCD_Driver::fill(uint16_t color) {
-  uint32_t i;
-
-  for (i = 0; i < 172 * 320 / 32; i++)
-    lcd_buff[i] = color;
-  _spi_mode_set();
-  _lcd_set_address(0, 0, lcd_w - 1, lcd_h - 1);
-  LCD_DATA;
-  LCD_CS_L;
-  for (i = 0; i < 32; i++) {
-    HAL_SPI_Transmit_DMA(&hspi1, (uint8_t *)lcd_buff, 320 * 172 / 16);
-    while (HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY)
-      ;
-  }
-  LCD_CS_H;
+// 交换缓冲区
+void LCD_Driver::swap_buffers(void) {
+  wait_for_display();
+  uint16_t *temp = active_buffer;
+  active_buffer = display_buffer;
+  display_buffer = temp;
 }
-// 局部填充
+
+// 等待DMA传输完成
+void LCD_Driver::wait_for_display(void) {
+  while (dma_busy) {
+    if (HAL_DMA_GetState(hspi1.hdmatx) == HAL_DMA_STATE_READY) {
+      dma_busy = false;
+      LCD_CS_H;
+    }
+  }
+}
+
+void LCD_Driver::fill(uint16_t color) {
+  for (uint32_t i = 0; i < LCD_BUFFER_SIZE; i++) {
+    active_buffer[i] = color;
+  }
+}
+
 void LCD_Driver::fillpart(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
                           uint16_t color) {
-  uint32_t i;
-  uint16_t w, h;
-  w = x2 - x1;
-  h = y2 - y1;
-  uint16_t total = w * h;
-  for (i = 0; i < total; i++)
-    lcd_buff[i] = color;
-  _spi_mode_set();
-  _lcd_set_address(x1, y1, x2, y2);
-  LCD_DATA;
-  LCD_CS_L;
-  HAL_SPI_Transmit_DMA(&hspi1, (uint8_t *)lcd_buff, total << 1);
-  while (HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY)
-    ;
-  LCD_CS_H;
+  if (x1 >= lcd_w || y1 >= LCD_PART_HEIGHT)
+    return;
+  if (x2 >= lcd_w)
+    x2 = lcd_w - 1;
+  if (y2 >= LCD_PART_HEIGHT)
+    y2 = LCD_PART_HEIGHT - 1;
+
+  for (uint16_t y = y1; y <= y2; y++) {
+    for (uint16_t x = x1; x <= x2; x++) {
+      active_buffer[y * lcd_w + x] = color;
+    }
+  }
 }
 
 void LCD_Driver::draw_rectangle(uint16_t x1, uint16_t y1, uint16_t x2,
                                 uint16_t y2) {
-  _spi_mode_set();
   _lcd_set_address(x1, y1, x2 - 1, y2 - 1);
   LCD_DATA;
-  LCD_CS_L;
-  HAL_SPI_Transmit_DMA(&hspi1, (uint8_t *)lcd_buff, (x2 - x1) * (y2 - y1) * 2);
-  while (HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY)
-    ;
-  LCD_CS_H;
+  _spi_sendDMA((uint8_t *)active_buffer, (x2 - x1) * (y2 - y1) * 2);
 }
+
 void LCD_Driver::draw_rectangle_Aim(uint16_t x1, uint16_t y1, uint16_t x2,
                                     uint16_t y2, uint16_t *buff) {
   _spi_mode_set();
@@ -282,12 +280,9 @@ void LCD_Driver::draw_rectangle_Aim(uint16_t x1, uint16_t y1, uint16_t x2,
 
 //
 void LCD_Driver::draw_point(uint16_t x, uint16_t y, uint16_t color) {
-  // _spi_mode_set();
-  _lcd_set_address(x, y, x, y);
-  LCD_DATA;
-  LCD_CS_L;
-  HAL_SPI_Transmit(&hspi1, (uint8_t *)&color, 2, 0xffff);
-  LCD_CS_H;
+  if (x >= lcd_w || y >= LCD_PART_HEIGHT)
+    return;
+  active_buffer[y * lcd_w + x] = color;
 }
 
 void LCD_Driver::draw_showchar(uint16_t x, uint16_t y, uint8_t chr,
@@ -350,11 +345,9 @@ uint32_t LCD_Pow(uint8_t m, uint8_t n) {
 
 void LCD_Driver::draw_shownum(uint16_t x, uint16_t y, uint16_t num, uint8_t len,
                               uint8_t size, uint16_t color, uint16_t bgcolor) {
-
   uint8_t t, temp;
   uint8_t enshow = 0;
   for (t = 0; t < len; t++) {
-
     temp = (num / LCD_Pow(10, len - t - 1)) % 10;
     if (enshow == 0 && t < (len - 1)) {
       if (temp == 0) {
@@ -368,35 +361,19 @@ void LCD_Driver::draw_shownum(uint16_t x, uint16_t y, uint16_t num, uint8_t len,
   }
 }
 
-//
-// void LCD_Driver::Color_bar_display(uint8_t len,uint16_t *buff){
-//    uint16_t i,j;
-//    uint16_t p = lcd_w / len;
-//    //uint16_t color[5]= {0xe00a,0x0bcd,0xe234,0xed12,0xccdd};
-//    for ( i = 0; i < lcd_h ; i++){
-//        for ( j = 0; j < lcd_w ; j++) {
-//            lcd_buff[lcd_w * i + j] = buff[ j / p];
-//        }
-//    }
-//}
-// void LCD_Driver::update(){
-//    _lcd_set_address(0,0,lcd_w - 1,lcd_h - 1);
-//    LCD_DATA;
-//    LCD_CS_L;
-//    HAL_SPI_Transmit_DMA(&hspi1,(uint8_t *)lcd_buff,45040);
-//    while(HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY);
-//    HAL_SPI_Transmit_DMA(&hspi1,(uint8_t *)(lcd_buff +22520),65040);
-//    while(HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY);
-//    LCD_CS_H;
-//}
-//
-// void LCD_Driver::part_update(uint16_t y1,uint16_t y2){
-//    uint16_t h = y2 - y1 - 1;
-//    while(HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY);
-//    _lcd_set_address(0,y1,lcd_w - 1,y2 - 1);
-//    LCD_DATA;
-//    LCD_CS_L;
-//    HAL_SPI_Transmit_DMA(&hspi1,(uint8_t *)(lcd_buff + lcd_w*y1),lcd_w*h*2);
-//    while(HAL_DMA_GetState(hspi1.hdmatx) != HAL_DMA_STATE_READY);
-//    LCD_CS_H;
-//}
+void LCD_Driver::update_display_part(bool is_upper_part) {
+  wait_for_display();
+
+  uint16_t start_y = is_upper_part ? 0 : LCD_PART_HEIGHT;
+  uint16_t end_y = is_upper_part ? LCD_PART_HEIGHT - 1 : lcd_h - 1;
+
+  _lcd_set_address(0, start_y, lcd_w - 1, end_y);
+  _lcd_datasDMA((uint8_t *)display_buffer, LCD_BUFFER_SIZE * 2);
+}
+
+extern "C" void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
+  if (hspi == &hspi1) {
+    LCD_CS_H;
+    g_dma_busy = false;
+  }
+}

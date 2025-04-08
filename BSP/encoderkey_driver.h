@@ -5,7 +5,11 @@
 #ifndef AURORA_ST_ENCODERKEY_DRIVER_H
 #define AURORA_ST_ENCODERKEY_DRIVER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "common_inc.h"
+void key_detect_api(void);
 
 // EncoderKey 状态
 typedef enum EncoderKeyState {
@@ -23,13 +27,16 @@ public:
   EncoderKeyState get_key_state(); // 获取按键状态
 
   void EncoderKey_EXTI_Callback(uint16_t GPIO_Pin);
-  void detect_key_state();
-
+  void EncoderKey_Detect(); // 按键检测
 private:
   EncoderKeyState key_state;
   uint32_t key_tick;
   uint8_t dclick_flag;
   uint8_t ec_flag;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // AURORA_ST_ENCODERKEY_DRIVER_H

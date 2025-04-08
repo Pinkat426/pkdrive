@@ -2,23 +2,22 @@
 // Created by HP on 2023/12/30.
 //
 
-#ifndef LCD_DRIVER_H
-#define LCD_DRIVER_H
+#ifndef PKDRIVE_LCD_DRIVER_H
+#define PKDRIVE_LCD_DRIVER_H
 
-#include "common_inc.h"
-#include <cstdint>
+#include "main.h"
+#include "spi.h"
+#include "usbd_cdc_if.h"
 
-// #define LCD_CS_H HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin,
-// GPIO_PIN_SET)
-// #define LCD_CS_L HAL_GPIO_WritePin(LCD_CS_GPIO_Port,
-// LCD_CS_Pin, GPIO_PIN_RESET)
-// #define LCD_CMD HAL_GPIO_WritePin(LCD_RS_GPIO_Port, LCD_RS_Pin,
-// GPIO_PIN_RESET) #define LCD_DATA HAL_GPIO_WritePin(LCD_RS_GPIO_Port,
-// LCD_RS_Pin, GPIO_PIN_SET)
 #define LCD_CMD LCD_RS_GPIO_Port->BSRR = (uint32_t)LCD_RS_Pin << 16U
 #define LCD_DATA LCD_RS_GPIO_Port->BSRR = (uint32_t)LCD_RS_Pin
 #define LCD_CS_H LCD_CS_GPIO_Port->BSRR = (uint32_t)LCD_CS_Pin
 #define LCD_CS_L LCD_CS_GPIO_Port->BSRR = (uint32_t)LCD_CS_Pin << 16U
+
+// 分屏双缓冲定义
+#define LCD_PART_HEIGHT 16
+#define LCD_WIDTH 17
+#define LCD_BUFFER_SIZE (LCD_WIDTH * LCD_PART_HEIGHT)
 
 class LCD_Driver {
 
@@ -48,6 +47,12 @@ public:
   void draw_shownum(uint16_t x, uint16_t y, uint16_t num, uint8_t len,
                     uint8_t size, uint16_t color, uint16_t bgcolor);
 
+  // 缓冲区管理
+  void update_display_part(bool is_upper_part);
+  void wait_for_display(void);
+  void swap_buffers(void);
+  uint16_t *get_active_buffer(void) { return active_buffer; }
+
 private:
   void _spi_send(uint8_t *data, uint16_t len); // spi 发送数据
   void _spi_sendDMA(uint8_t *data, uint16_t len);
@@ -64,9 +69,15 @@ public:
   uint16_t lcd_w;
   uint16_t lcd_h;
 
-  //  uint16_t lcd_buff[172*320];
 private:
   uint8_t HORIZONTAL;
+
+  // 双缓冲区
+  uint16_t buffer1[LCD_BUFFER_SIZE];
+  uint16_t buffer2[LCD_BUFFER_SIZE];
+  uint16_t *active_buffer;  // 当前活动缓冲区
+  uint16_t *display_buffer; // 当前显示缓冲区
+  bool dma_busy;
 };
 
-#endif // LCD_DRIVER_H
+#endif // PKDRIVE_LCD_DRIVER_H

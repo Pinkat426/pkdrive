@@ -28,14 +28,17 @@ public:
                  uint32_t data2, uint32_t data3, uint32_t data4);
   void set_position(uint8_t number, float position);
   void set_aim(float x, float y);
+  void set_IqId(float Iq, float Id);
 
 private:
-  PKFOC focL; // 左电机FOC控制
-  PKFOC focR; // 右电机FOC控制
+  // PKFOC focL;    // 左电机FOC控制
+  PKFOC foccore; // 电机FOC控制
+  PKFOC focR;    // 右电机FOC控制
   Motor_State Lstate, Rstate;
 
   uint32_t Send_Detail_cnt;
   uint8_t Send_Detail_Flag;
+  uint8_t motor_id;
 };
 
 #endif /* MOTOR_H */

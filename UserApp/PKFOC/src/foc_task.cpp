@@ -1,10 +1,13 @@
 #include "foc_task.h"
+#include "FreeRTOS.h"
 #include "as5047p.h"
 #include "comm_define.h"
 #include "common_inc.h"
 #include "motor.h"
+#include "mpu6050_driver.h"
 #include "queue.h"
 #include "stm32f4xx.h"
+#include "task.h"
 #include <cstdint>
 #include <stdint.h>
 
@@ -52,6 +55,8 @@ volatile uint32_t flag_r = 0;
 AS5047P encoderL(&hspi3, SPI3_CS_GPIO_Port, SPI3_CS_Pin);
 AS5047P encoderR(&hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
 
+float mpu6050Data[3];
+
 static Motor motor;
 
 volatile uint16_t angle_int;
@@ -59,35 +64,54 @@ volatile uint16_t angle_int;
 float angle_float;
 float pc_aim_pos = 0.0f;
 void foc_task(void) {
+  MPU6050_Driver mpu6050(MPU6050_SCL_GPIO_Port, MPU6050_SCL_Pin,
+                         MPU6050_SDA_GPIO_Port, MPU6050_SDA_Pin);
+
+  mpu6050.Init();
   motor.add_AS5047_Driver(&encoderL, &encoderR);
   motor.enable_current_sampling(ENABLE, ENABLE);
   motor.start_pwm();
   FocMsg_t received_msg;
   // FOC线程主循环
   while (1) {
-    if (1) {
-      if (xQueueReceive(xFocQueue, &received_msg, portMAX_DELAY) == pdPASS) {
-        switch (received_msg.type) {
-        case AIM_CMD:
-          PRINT(WIN, "%d,%d", received_msg.aim.x, received_msg.aim.y);
-          // 处理坐标指令
-          break;
-        case SPD_CMD:
-          // 处理速度指令
-          PRINT(WIN, "%d", received_msg.speed);
-          break;
-        case POS_CMD:
-          // 处理位置指令
-          pc_aim_pos = ((float)received_msg.position) / 1000.0f;
-          motor.set_position(0, pc_aim_pos);
-          break;
-        }
+    // 临界区
+    // taskENTER_CRITICAL();
+    // mpu6050.read_angle(&mpu6050Data[0], &mpu6050Data[1], &mpu6050Data[2]);
+    // taskEXIT_CRITICAL();
+
+    // PRINT(WIN, "%f,%f,%f", mpu6050Data[0], mpu6050Data[1], mpu6050Data[2]);
+    // motor.set_position(0, 250 - mpu6050Data[1]);
+    // PRINT(WIN, "%.3f,%.3f", 250 - mpu6050Data[1], angle_float - 250);
+    //  使用非阻塞方式检查队列
+    if (xQueueReceive(xFocQueue, &received_msg, 0) == pdPASS) {
+      switch (received_msg.type) {
+      case AIM_CMD:
+        PRINT(WIN, "%d,%d", received_msg.aim.x, received_msg.aim.y);
+        // 处理坐标指令
+        break;
+      case SPD_CMD:
+        // 处理速度指令
+        PRINT(WIN, "%d", received_msg.speed);
+        break;
+      case POS_CMD:
+        // 处理位置指令
+        pc_aim_pos = ((float)received_msg.position) / 1000.0f;
+        motor.set_position(0, pc_aim_pos);
+        break;
+      case IqId_CMD:
+        // PRINT(WIN, "%.3f,%.3f", received_msg.IqId.Iq, received_msg.IqId.Id);
+        motor.set_IqId(received_msg.IqId.Iq, received_msg.IqId.Id);
+        break;
       }
     }
+
     osDelay(1);
   }
 }
 uint32_t dwt_cycle;
+
+uint32_t adc_count = 0;
+
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc) {
 
   // 临界区保护
@@ -114,7 +138,6 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc) {
     IL_value[1] = IL_value1_sum / 10;
     motor.main_deal(ENABLE, DISABLE, IL_value[0], IL_value[1], IR_value[0],
                     IR_value[1]);
-
     dwt_end = DWT->CYCCNT;
     dwt_cycle = dwt_end - dwt_start;
     if (run_count == 10) {

@@ -113,3 +113,11 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
 -u _printf_float
 )
+
+# 添加内存分析脚本
+add_custom_command(
+    TARGET ${CMAKE_PROJECT_NAME}
+    POST_BUILD
+    COMMAND python ${CMAKE_SOURCE_DIR}/memory_analyzer.py
+    COMMENT "Generating memory usage analysis..."
+)

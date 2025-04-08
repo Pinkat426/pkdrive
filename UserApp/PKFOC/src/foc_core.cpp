@@ -25,7 +25,7 @@ PKFOC::PKFOC(SPI_HandleTypeDef *hspi, TIM_HandleTypeDef *htim,
   ADC_Uw_offset = 2048;
 
   // 目标电流
-  target_Iq = 0.0f;
+  target_Iq = 0.1f;
   target_Id = 0.0f;
 
   // 电机方向和标志位
@@ -136,8 +136,8 @@ void PKFOC::ctrl_I_Loop() {
   // 电流环PI控制
   Uq = I_pid_q.cal_PI_AntiSaturation(Iq);
   Ud = I_pid_d.cal_PI_AntiSaturation(Id);
-
-  // 限制电压输出
+  PRINT(foc, "%.3f,%.3f,%.3f,%.3f", Iq, Id, target_Iq, target_Id);
+  //  限制电压输出
   Uq = (Uq > UqUd_Limit_Max)    ? UqUd_Limit_Max
        : (Uq < -UqUd_Limit_Max) ? -UqUd_Limit_Max
                                 : Uq;
@@ -271,14 +271,14 @@ void PKFOC::my_pos_control() {
   ipark();
   generate_svpwm();
 }
-
+extern float mpu6050Data[3];
 void PKFOC::my_aim_control() {
   run_timesk++;
   if (run_timesk == 4) {
     get_angle();
     cal_angle_sincos();
     run_timesk = 0;
-    // PRINT(foc, "%.3f", angle);
+    PRINT(foc, "%.3f,%.3f", angle, 250 - mpu6050Data[1]);
   }
 
   clark();

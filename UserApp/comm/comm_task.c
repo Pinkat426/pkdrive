@@ -111,4 +111,25 @@ void msg_deal(uint8_t *buf, uint32_t len) {
 
     // PRINT(mod, "%d", mod);
   }
+  if (buf[1] == 'i' && buf[2] == 'q' && buf[3] == 'i' && buf[4] == 'd') {
+    // usb_printf("CMD IqId \r\n");
+    /* IqId数据解析 */
+    char Iq_str[7] = {0}; // 6字符+结束符
+    char Id_str[7] = {0}; // 6字符+结束符
+    float Iq = 0;
+    float Id = 0;
+    // 提取X坐标（4-9字节）和Y坐标（10-15字节）
+    memcpy(Iq_str, &buf[5], 6);
+    memcpy(Id_str, &buf[11], 6);
+
+    // 转换为浮点型（带符号）
+    Iq = atof(Iq_str);
+    Id = atof(Id_str);
+    // PRINT(recv, "%.3f,%.3f", Iq, Id);
+    new_msg.type = IqId_CMD;
+    new_msg.IqId.Iq = Iq;
+    new_msg.IqId.Id = Id;
+
+    xStatus = xQueueSendToBack(xFocQueue, &new_msg, 0);
+  }
 }

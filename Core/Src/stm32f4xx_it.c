@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file    stm32f4xx_it.c
-  * @brief   Interrupt Service Routines.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    stm32f4xx_it.c
+ * @brief   Interrupt Service Routines.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -22,6 +22,10 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "SEGGER_RTT.h"
+#include "common_inc.h"
+#include "stm32f4xx_hal_gpio.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,6 +66,7 @@ extern DMA_HandleTypeDef hdma_spi1_tx;
 extern DMA_HandleTypeDef hdma_spi3_rx;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim8;
+extern TIM_HandleTypeDef htim10;
 extern TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN EV */
@@ -80,8 +85,7 @@ void NMI_Handler(void)
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-   while (1)
-  {
+  while (1) {
   }
   /* USER CODE END NonMaskableInt_IRQn 1 */
 }
@@ -92,11 +96,72 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
+  uint32_t cfsr = SCB->CFSR;
+  uint32_t hfsr = SCB->HFSR;
+  uint32_t bfar = SCB->BFAR;
+  uint32_t pc;
+  uint32_t lr;
 
+  // 获取程序计数器和链接寄存器的值
+  __asm volatile("mov %0, pc" : "=r"(pc));
+  __asm volatile("mov %0, lr" : "=r"(lr));
+
+  // 总线错误（如非法地址访问）
+  if (cfsr & 0x0000FF00) {
+    SEGGER_RTT_printf(0, "\r\n[BUS FAULT DETECTED]\r\n");
+    SEGGER_RTT_printf(0, "Program Counter (PC) = 0x%08X\r\n", pc);
+    SEGGER_RTT_printf(0, "Link Register (LR) = 0x%08X\r\n", lr);
+    SEGGER_RTT_printf(0, "Configurable Fault Status (CFSR) = 0x%08X\r\n", cfsr);
+    SEGGER_RTT_printf(0, "Hard Fault Status (HFSR) = 0x%08X\r\n", hfsr);
+
+    if (cfsr & (1 << 15)) {
+      SEGGER_RTT_printf(0, "BFARVALID: Bus Fault Address Register = 0x%08X\r\n",
+                        bfar);
+    }
+    if (cfsr & (1 << 13)) {
+      SEGGER_RTT_printf(0, "STKERR: Bus fault occurred during stack push\r\n");
+    }
+    if (cfsr & (1 << 12)) {
+      SEGGER_RTT_printf(0, "UNSTKERR: Bus fault occurred during stack pop\r\n");
+    }
+    if (cfsr & (1 << 11)) {
+      SEGGER_RTT_printf(0, "IMPRECISERR: Imprecise data access error\r\n");
+    }
+    if (cfsr & (1 << 10)) {
+      SEGGER_RTT_printf(0, "PRECISERR: Precise data access error\r\n");
+    }
+    if (cfsr & (1 << 9)) {
+      SEGGER_RTT_printf(0, "IBUSERR: Bus fault on instruction fetch\r\n");
+    }
+
+    // Additional debug information
+    SEGGER_RTT_printf(0, "\r\n[System Status]\r\n");
+    if (HAL_DMA_GetState(&hdma_spi1_tx) != HAL_DMA_STATE_READY) {
+      SEGGER_RTT_printf(0, "DMA1 TX Status: Not Ready\r\n");
+    }
+    if (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY) {
+      SEGGER_RTT_printf(0, "SPI1 Status: Not Ready\r\n");
+    }
+    while (1) {
+    }
+  }
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    uint32_t cfsr = SCB->CFSR;
+
+    // 用法错误（如未对齐访问、除零）
+    if (cfsr & 0xFF000000) { /* 处理用法错误 */
+      while (1) {
+      }
+    }
+
+    // 内存管理错误（如访问权限冲突）
+    if (cfsr & 0x000000FF) { /* 处理内存管理错误 */
+      while (1) {
+      }
+    }
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
 }
@@ -204,6 +269,7 @@ void TIM1_UP_TIM10_IRQHandler(void)
 
   /* USER CODE END TIM1_UP_TIM10_IRQn 0 */
   HAL_TIM_IRQHandler(&htim1);
+  HAL_TIM_IRQHandler(&htim10);
   /* USER CODE BEGIN TIM1_UP_TIM10_IRQn 1 */
 
   /* USER CODE END TIM1_UP_TIM10_IRQn 1 */

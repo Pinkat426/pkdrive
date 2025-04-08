@@ -13,6 +13,7 @@ typedef enum {
   AIM_CMD,
   SPD_CMD,
   POS_CMD,
+  IqId_CMD,
 } FocMsgType_t;
 
 // 定义消息结构体
@@ -24,6 +25,10 @@ typedef struct {
     } aim;
     int32_t speed;
     int32_t position;
+    struct {
+      float Iq;
+      float Id;
+    } IqId;
   };
 } FocMsg_t;
 

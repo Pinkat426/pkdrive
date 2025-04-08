@@ -38,6 +38,6 @@ extern "C" {
 }
 
 /*---------------------------- C++ Scope ---------------------------*/
-
+#include "encoderkey_driver.h"
 #endif
 #endif
